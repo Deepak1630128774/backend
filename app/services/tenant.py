@@ -7,6 +7,9 @@ from ..database import get_connection
 from ..settings import APP_BASE_URL
 
 
+PLATFORM_HOST_SUFFIXES = (".onrender.com",)
+
+
 @dataclass
 class TenantContext:
     scope: str
@@ -28,6 +31,15 @@ def _platform_hosts() -> set[str]:
     return {host for host in hosts if host}
 
 
+def _is_platform_host(host: str) -> bool:
+    normalized = host.strip().lower()
+    if not normalized:
+        return True
+    if normalized in _platform_hosts():
+        return True
+    return any(normalized.endswith(suffix) for suffix in PLATFORM_HOST_SUFFIXES)
+
+
 def _extract_host(request: Request) -> str:
     workspace_host = request.headers.get("x-workspace-host", "").strip().lower()
     origin = request.headers.get("origin", "").strip()
@@ -47,7 +59,7 @@ def _extract_host(request: Request) -> str:
 
 def get_tenant_context(request: Request) -> TenantContext:
     host = _extract_host(request)
-    if not host or host in _platform_hosts():
+    if _is_platform_host(host):
         return TenantContext(scope="platform", host=host)
 
     host_parts = [part for part in host.split(".") if part]
